@@ -1,4 +1,4 @@
-module soci-cdn
+module soci-video-cdn
 
 go 1.14
 
