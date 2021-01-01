@@ -9,7 +9,8 @@ import (
 )
 
 func setupRoutes(settings *config.Config) {
-	http.Handle("/", http.FileServer(http.Dir("./files")))
+	http.Handle("/", http.FileServer(http.Dir("./files/videos")))
+	http.Handle("/thumbnail/", http.StripPrefix("/thumbnail/", http.FileServer(http.Dir("./files/thumbnails"))))
 	http.HandleFunc("/upload", route.UploadFile)
 	http.HandleFunc("/move", route.MoveFile)
 
