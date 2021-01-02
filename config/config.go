@@ -2,19 +2,54 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"os"
 )
 
 // Config structure for server
 type Config struct {
-	Port string `yaml:"port"`
+	Port    string `yaml:"port"`
+	APIHost string `yaml:"api_host"`
+}
+
+// copy the source to destination when not existed
+func checkFileExists(source string, destination string) error {
+	if _, err := os.Stat(destination); os.IsNotExist(err) {
+		input, err := ioutil.ReadFile(source)
+		if err != nil {
+			return fmt.Errorf("source %s: %v", source, err)
+		}
+
+		if err = ioutil.WriteFile(destination, input, 0644); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // ParseJSONFile the config file
 func ParseJSONFile(filename string, c *Config) error {
+	source := filename + ".example"
+	// check if the file is existed
+	if err := checkFileExists(source, filename); err != nil {
+		return err
+	}
+
+	// read and unmarshal file
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
 	}
 	return json.Unmarshal(data, c)
+}
+
+// Validate the config value
+func (c *Config) Validate() error {
+	if c.APIHost == "" {
+		c.APIHost = "https://api.non.io"
+	}
+
+	return nil
 }

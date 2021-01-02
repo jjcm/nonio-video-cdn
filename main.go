@@ -32,6 +32,10 @@ func main() {
 	if err := config.ParseJSONFile("./config.json", &settings); err != nil {
 		panic(err)
 	}
+	// validate the config file
+	if err := settings.Validate(); err != nil {
+		panic(err)
+	}
 
 	fmt.Println("Starting video encoding server...")
 	setupRoutes(&settings)
