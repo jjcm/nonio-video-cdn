@@ -9,8 +9,8 @@ import (
 
 // Config structure for server
 type Config struct {
-	Port    string `yaml:"port"`
-	APIHost string `yaml:"api_host"`
+	Port    string `json:"port"`
+	APIHost string `json:"api_host"`
 }
 
 // copy the source to destination when not existed
