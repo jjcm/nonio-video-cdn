@@ -16,6 +16,8 @@ type Config struct {
 // copy the source to destination when not existed
 func checkFileExists(source string, destination string) error {
 	if _, err := os.Stat(destination); os.IsNotExist(err) {
+		fmt.Println("No config detected. Setting sensible defaults for local development...")
+
 		input, err := ioutil.ReadFile(source)
 		if err != nil {
 			return fmt.Errorf("source %s: %v", source, err)
