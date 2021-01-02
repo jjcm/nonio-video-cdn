@@ -15,7 +15,7 @@ func setupRoutes(settings *config.Config) {
 
 	port := os.Getenv("APP_PORT")
 	if port == "" {
-		port = settings.Server.Port
+		port = settings.Port
 		if port == "" {
 			port = "4204"
 		}
@@ -28,7 +28,7 @@ func setupRoutes(settings *config.Config) {
 func main() {
 	var settings config.Config
 	// parse the config file
-	if err := config.ParseYamlFile("./config.yml", &settings); err != nil {
+	if err := config.ParseJSONFile("./config.json", &settings); err != nil {
 		panic(err)
 	}
 
