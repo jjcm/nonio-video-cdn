@@ -63,7 +63,7 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 	case "image":
 		err = encode.Image(file, url)
 	case "video":
-		err = encode.Video(file, url)
+		err = encode.Video(file, url, w, r)
 	}
 	if err != nil {
 		util.SendError(w, "Error encoding the file.", 500)

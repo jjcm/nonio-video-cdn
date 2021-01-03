@@ -1,16 +1,38 @@
 package encode
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"mime/multipart"
-	"os"
-	"os/exec"
+	ffmpeg "github.com/floostack/transcoder/ffmpeg"
+	"github.com/gorilla/websocket"
+	"time"
+	"net/http"
+)
+
+const (
+	pongWait = 60 * time.Second
+	pingPeriod = (pongWait * 9) / 10
+)
+
+var (
+	upgrader = websocket.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+	}
 )
 
 // Video encodes the video into a webm and returns the path to it
-func Video(file multipart.File, url string) error {
+func Video(file multipart.File, url string, w http.ResponseWriter, r *http.Request) error {
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		if _, ok := err.(websocket.HandshakeError); !ok {
+			fmt.Println(err)
+		}
+		return err
+	}
+
+	fmt.Println(ws)
 	// Create a temp file
 	tempFile, err := ioutil.TempFile("files/temp-videos", "video-*.mp4")
 	if err != nil {
@@ -25,6 +47,37 @@ func Video(file multipart.File, url string) error {
 	}
 	tempFile.Write(fileBytes)
 
+	format := "mp4"
+	overwrite := true
+
+	opts := ffmpeg.Options{
+		OutputFormat: &format,
+		Overwrite:    &overwrite,
+	}
+
+	ffmpegConf := &ffmpeg.Config{
+		FfmpegBinPath:   "/usr/local/bin/ffmpeg",
+		FfprobeBinPath:  "/usr/local/bin/ffprobe",
+		ProgressEnabled: true,
+	}
+
+	fmt.Println(tempFile.Name())
+	progress, err := ffmpeg.
+	New(ffmpegConf).
+	Input(tempFile.Name()).
+	Output(fmt.Sprintf("files/videos/%v.webm", url)).
+	WithOptions(opts).
+	Start(opts)
+
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	for msg := range progress {
+		fmt.Println(msg)
+	}
+
+	/*
 	// since this is a video we'll use ffmpeg to encode it
 	cmd := exec.Command("ffmpeg", "-y", "-i", tempFile.Name(), "-c:v", "libvpx-vp9", "-b:v", "2M", fmt.Sprintf("files/videos/%v.webm", url))
 	workingDir, err := os.Getwd()
@@ -35,6 +88,7 @@ func Video(file multipart.File, url string) error {
 	var output bytes.Buffer
 	cmd.Stderr = &output
 	err = cmd.Run()
+	*/
 
 	// probs don't need to full panic?
 	/*
