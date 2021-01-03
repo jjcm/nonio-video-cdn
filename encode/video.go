@@ -22,6 +22,11 @@ var (
 	}
 )
 
+
+//TODO 
+// I should probs break this into two requests - the upload request, after which returns the temp file name
+// then the encode request, which is a websocket req with the temp file name
+
 // Video encodes the video into a webm and returns the path to it
 func Video(file multipart.File, url string, w http.ResponseWriter, r *http.Request) error {
 	ws, err := upgrader.Upgrade(w, r, nil)
