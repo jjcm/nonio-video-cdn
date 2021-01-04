@@ -2,9 +2,10 @@ package route
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"regexp"
-	"soci-video-cdn/encode"
 	"soci-video-cdn/util"
 
 	"github.com/google/uuid"
@@ -30,20 +31,23 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse our url, and check if the url is available
-	url := r.FormValue("url")
-	if url != "" {
-		urlIsAvailable, err := util.CheckIfURLIsAvailable(url)
-		if err != nil {
-			util.SendError(w, "Error checking requested url.", 500)
-			return
+	url := uuid.New().String()
+	/*
+		url := r.FormValue("url")
+		if url != "" {
+			urlIsAvailable, err := util.CheckIfURLIsAvailable(url)
+			if err != nil {
+				util.SendError(w, "Error checking requested url.", 500)
+				return
+			}
+			if urlIsAvailable == false {
+				util.SendError(w, "Url is taken.", 400)
+				return
+			}
+		} else {
+			url = uuid.New().String()
 		}
-		if urlIsAvailable == false {
-			util.SendError(w, "Url is taken.", 400)
-			return
-		}
-	} else {
-		url = uuid.New().String()
-	}
+	*/
 
 	// Parse our file and assign it to the proper handlers depending on the type
 	file, handler, err := r.FormFile("files")
@@ -57,17 +61,20 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 	var mimeType = handler.Header["Content-Type"][0]
 
 	// If all is good, let's log what the hell is going on
-	fmt.Printf("%v is uploading a %v of size %v to %v", user, re.FindStringSubmatch(mimeType)[1], handler.Size, url)
+	fmt.Printf("%v is uploading a %v of size %v to %v\n", user, re.FindStringSubmatch(mimeType)[1], handler.Size, url)
 
-	switch re.FindStringSubmatch(mimeType)[1] {
-	case "image":
-		err = encode.Image(file, url)
-	case "video":
-		err = encode.Video(file, url, w, r)
-	}
+	tempFile, err := ioutil.TempFile("files/temp-videos", "video-*.mp4")
 	if err != nil {
-		util.SendError(w, "Error encoding the file.", 500)
+		fmt.Println(err)
 	}
+	defer tempFile.Close()
 
-	util.SendResponse(w, url, 200)
+	// read the uploaded file into a buffer and write it to our temp file
+	fileBytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		fmt.Println(err)
+	}
+	tempFile.Write(fileBytes)
+
+	util.SendResponse(w, filepath.Base(tempFile.Name()), 200)
 }
