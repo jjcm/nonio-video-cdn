@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"mime/multipart"
+	"net/http"
+	"time"
+
 	ffmpeg "github.com/floostack/transcoder/ffmpeg"
 	"github.com/gorilla/websocket"
-	"time"
-	"net/http"
 )
 
 const (
-	pongWait = 60 * time.Second
+	pongWait   = 60 * time.Second
 	pingPeriod = (pongWait * 9) / 10
 )
 
@@ -22,22 +23,12 @@ var (
 	}
 )
 
-
-//TODO 
+//TODO
 // I should probs break this into two requests - the upload request, after which returns the temp file name
 // then the encode request, which is a websocket req with the temp file name
 
 // Video encodes the video into a webm and returns the path to it
 func Video(file multipart.File, url string, w http.ResponseWriter, r *http.Request) error {
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		if _, ok := err.(websocket.HandshakeError); !ok {
-			fmt.Println(err)
-		}
-		return err
-	}
-
-	fmt.Println(ws)
 	// Create a temp file
 	tempFile, err := ioutil.TempFile("files/temp-videos", "video-*.mp4")
 	if err != nil {
@@ -68,11 +59,11 @@ func Video(file multipart.File, url string, w http.ResponseWriter, r *http.Reque
 
 	fmt.Println(tempFile.Name())
 	progress, err := ffmpeg.
-	New(ffmpegConf).
-	Input(tempFile.Name()).
-	Output(fmt.Sprintf("files/videos/%v.webm", url)).
-	WithOptions(opts).
-	Start(opts)
+		New(ffmpegConf).
+		Input(tempFile.Name()).
+		Output(fmt.Sprintf("files/videos/%v.webm", url)).
+		WithOptions(opts).
+		Start(opts)
 
 	if err != nil {
 		fmt.Println(err)
@@ -83,16 +74,16 @@ func Video(file multipart.File, url string, w http.ResponseWriter, r *http.Reque
 	}
 
 	/*
-	// since this is a video we'll use ffmpeg to encode it
-	cmd := exec.Command("ffmpeg", "-y", "-i", tempFile.Name(), "-c:v", "libvpx-vp9", "-b:v", "2M", fmt.Sprintf("files/videos/%v.webm", url))
-	workingDir, err := os.Getwd()
-	if err != nil {
-		fmt.Println(err)
-	}
-	cmd.Dir = workingDir
-	var output bytes.Buffer
-	cmd.Stderr = &output
-	err = cmd.Run()
+		// since this is a video we'll use ffmpeg to encode it
+		cmd := exec.Command("ffmpeg", "-y", "-i", tempFile.Name(), "-c:v", "libvpx-vp9", "-b:v", "2M", fmt.Sprintf("files/videos/%v.webm", url))
+		workingDir, err := os.Getwd()
+		if err != nil {
+			fmt.Println(err)
+		}
+		cmd.Dir = workingDir
+		var output bytes.Buffer
+		cmd.Stderr = &output
+		err = cmd.Run()
 	*/
 
 	// probs don't need to full panic?

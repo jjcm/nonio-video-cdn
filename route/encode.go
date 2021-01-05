@@ -70,42 +70,64 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 	nativeSize := math.Max(x, y)
+	aspectRatio := x / y
+	fmt.Println(nativeSize)
+	fmt.Println(aspectRatio)
 
 	/*
-		if err = EncodeToFormat(ws, filename, "webm", "libvpx-vp9", "2M"); err != nil {
+		if err = EncodeToFormat(ws, filename, "mp4", "h264", "2M", "300x200"); err != nil {
 			return
 		}
 	*/
 
-	if err = EncodeToFormat(ws, filename, "mp4", "h264", "2M"); err != nil {
-		return
+	// For bitrates, we use 2 * the number of pixels
+	// I.e. 8k has 33 million pixels, so we use 66Mbps
+	nativeBitrate := "2M"
+
+	// Halfway between 720p and 480p
+	// ( 1280 + 854 ) / 2 == 1600
+	if nativeSize > 1067 {
+		nativeBitrate = "1.8M"
+		fmt.Println("need a 480p encode")
+		if err = EncodeToFormat(ws, filename, "mp4", "h264", "0.8M", "0x0"); err != nil {
+			return
+		}
 	}
 
-	if nativeSize > 3840 {
+	// Seriously what are they uploading that we need to downscale to 4k?
+	// Halfway between 8k and 4k
+	// ( 7680 + 3840 ) / 2 == 5760
+	if nativeSize > 5760 {
+		nativeBitrate = "66M"
 		fmt.Println("need a 4k encode")
 	}
 
-	if nativeSize > 2560 {
+	// Halfway between 4k and 1440p
+	// ( 3840 + 2560 ) / 2 == 3200
+	if nativeSize > 3200 {
+		nativeBitrate = "10M"
 		fmt.Println("need a 1440p encode")
 	}
 
-	if nativeSize > 1920 {
+	// Halfway between 1440p and 1080p
+	// ( 2560 + 1920 ) / 2 == 2240
+	if nativeSize > 2240 {
+		nativeBitrate = "10M"
 		fmt.Println("need a 1080p encode")
 	}
 
-	if nativeSize > 1280 {
+	// Halfway between 1080p and 720p
+	// ( 1920 + 1280 ) / 2 == 1600
+	if nativeSize > 1600 {
 		fmt.Println("need a 720p encode")
 	}
 
-	if nativeSize > 854 {
-		fmt.Println("need a 480p encode")
-	}
-
+	fmt.Println(nativeBitrate)
 	fmt.Printf("Encoding finished for %v\n", filename)
 }
 
 // EncodeToFormat encodes a video source and sends back progress via the websocket
-func EncodeToFormat(ws *websocket.Conn, filename string, format string, codec string, bitrate string) error {
+func EncodeToFormat(ws *websocket.Conn, filename string, format string, codec string, bitrate string, size string) error {
 	// Set up our encoding options
 	ffmpegConf := &ffmpeg.Config{
 		FfmpegBinPath:   "/usr/local/bin/ffmpeg",
@@ -120,6 +142,7 @@ func EncodeToFormat(ws *websocket.Conn, filename string, format string, codec st
 		Overwrite:    &overwrite,
 		VideoCodec:   &codec,
 		VideoBitRate: &bitrate,
+		Resolution:   &size,
 	}
 
 	ws.WriteMessage(websocket.TextMessage, []byte("Starting webm encode"))
