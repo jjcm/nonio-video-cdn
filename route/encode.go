@@ -174,6 +174,9 @@ func EncodeToFormat(ws *websocket.Conn, filename string, suffix string, bitrate 
 		Start(opts)
 
 	if err != nil {
+		// TODO: this doesn't seem to throw an error when things go wrong.
+		// Easiest way to test: try and encode a h264 video at 25x25 resolution
+		// It will fail since h264 doesn't allow resolutions that arent divisible by 2
 		fmt.Println(err)
 		ws.WriteMessage(websocket.TextMessage, []byte("Error"))
 		return 0, err
