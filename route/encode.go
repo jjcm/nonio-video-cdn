@@ -190,6 +190,7 @@ func EncodeToFormat(ws *websocket.Conn, filename string, suffix string, bitrate 
 	for msg := range progress {
 		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%v:%.1f", suffix, msg.GetProgress())))
 	}
+	ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%v:100", suffix)))
 
 	now = time.Now()
 	end := now.Unix()
