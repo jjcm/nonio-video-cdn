@@ -41,27 +41,70 @@ func MoveFile(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the file we're moving exists
 	tempFile := r.FormValue("oldUrl")
-	if _, err := os.Stat(fmt.Sprintf("files/images/%v.webp", tempFile)); os.IsNotExist(err) {
+	if _, err := os.Stat(fmt.Sprintf("files/videos/%v.mp4", tempFile)); os.IsNotExist(err) {
 		util.SendError(w, "No temp image exists with that name.", 400)
 		fmt.Println(err)
 		return
 	}
-	if _, err := os.Stat(fmt.Sprintf("files/thumbnails/%v.webp", tempFile)); os.IsNotExist(err) {
-		util.SendError(w, "No temp thumbnail exists with that name.", 400)
-		fmt.Println(err)
-		return
-	}
+	/*
+		if _, err := os.Stat(fmt.Sprintf("files/thumbnails/%v.webp", tempFile)); os.IsNotExist(err) {
+			util.SendError(w, "No temp thumbnail exists with that name.", 400)
+			fmt.Println(err)
+			return
+		}
+	*/
 
 	// If everything else looks good, lets move the file.
-	err = os.Rename(fmt.Sprintf("files/images/%v.webp", tempFile), fmt.Sprintf("files/images/%v.webp", url))
+	err = os.Rename(fmt.Sprintf("files/videos/%v.mp4", tempFile), fmt.Sprintf("files/images/%v.mp4", url))
 	if err != nil {
 		util.SendError(w, "Error renaming file.", 500)
 		return
 	}
-	err = os.Rename(fmt.Sprintf("files/thumbnails/%v.webp", tempFile), fmt.Sprintf("files/thumbnails/%v.webp", url))
-	if err != nil {
-		util.SendError(w, "Error renaming thumbnail.", 500)
-		return
+	/*
+		err = os.Rename(fmt.Sprintf("files/thumbnails/%v.webp", tempFile), fmt.Sprintf("files/thumbnails/%v.webp", url))
+		if err != nil {
+			util.SendError(w, "Error renaming thumbnail.", 500)
+			return
+		}
+	*/
+	if _, err := os.Stat("files/videos/%v-2160p.mp4"); err == nil {
+		err = os.Rename(fmt.Sprintf("files/videos/%v-2160.mp4", tempFile), fmt.Sprintf("files/images/%v-2160.mp4", url))
+		if err != nil {
+			util.SendError(w, "Error renaming 2160p res file.", 500)
+			return
+		}
+	}
+
+	if _, err := os.Stat("files/videos/%v-1440p.mp4"); err == nil {
+		err = os.Rename(fmt.Sprintf("files/videos/%v-1440.mp4", tempFile), fmt.Sprintf("files/images/%v-1440.mp4", url))
+		if err != nil {
+			util.SendError(w, "Error renaming 1440p res file.", 500)
+			return
+		}
+	}
+
+	if _, err := os.Stat("files/videos/%v-1080p.mp4"); err == nil {
+		err = os.Rename(fmt.Sprintf("files/videos/%v-1080.mp4", tempFile), fmt.Sprintf("files/images/%v-1080.mp4", url))
+		if err != nil {
+			util.SendError(w, "Error renaming 1080p res file.", 500)
+			return
+		}
+	}
+
+	if _, err := os.Stat("files/videos/%v-720p.mp4"); err == nil {
+		err = os.Rename(fmt.Sprintf("files/videos/%v-720.mp4", tempFile), fmt.Sprintf("files/images/%v-720.mp4", url))
+		if err != nil {
+			util.SendError(w, "Error renaming 720p res file.", 500)
+			return
+		}
+	}
+
+	if _, err := os.Stat("files/videos/%v-480p.mp4"); err == nil {
+		err = os.Rename(fmt.Sprintf("files/videos/%v-480.mp4", tempFile), fmt.Sprintf("files/images/%v-480.mp4", url))
+		if err != nil {
+			util.SendError(w, "Error renaming 480p res file.", 500)
+			return
+		}
 	}
 
 	// Send back a response.
