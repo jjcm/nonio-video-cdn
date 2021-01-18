@@ -13,6 +13,8 @@ type Config struct {
 	APIHost string `json:"api_host"`
 }
 
+var Settings Config
+
 // copy the source to destination when not existed
 func checkFileExists(source string, destination string) error {
 	if _, err := os.Stat(destination); os.IsNotExist(err) {

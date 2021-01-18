@@ -28,16 +28,15 @@ func setupRoutes(settings *config.Config) {
 }
 
 func main() {
-	var settings config.Config
 	// parse the config file
-	if err := config.ParseJSONFile("./config.json", &settings); err != nil {
+	if err := config.ParseJSONFile("./config.json", &config.Settings); err != nil {
 		panic(err)
 	}
 	// validate the config file
-	if err := settings.Validate(); err != nil {
+	if err := config.Settings.Validate(); err != nil {
 		panic(err)
 	}
 
 	fmt.Println("Starting video encoding server...")
-	setupRoutes(&settings)
+	setupRoutes(&config.Settings)
 }
