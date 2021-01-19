@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"soci-video-cdn/config"
 )
 
 // CheckIfURLIsAvailable hits our api server and checks to see if the url is available to upload to
 func CheckIfURLIsAvailable(url string) (bool, error) {
-	urlCheckRes, err := http.Get(fmt.Sprintf("https://api.non.io/post/url-is-available/%v", url))
+	urlCheckRes, err := http.Get(fmt.Sprintf("%v/post/url-is-available/%v", config.Settings.APIHost, url))
 	if err != nil {
 		fmt.Println("Error checking if url is available")
 		fmt.Println(err)
