@@ -56,7 +56,7 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	resolution := strings.Split(strings.TrimSuffix(string(out), "\n"), "x")
+	resolution := strings.Split(strings.TrimSpace(string(out)), "x")
 	if len(resolution) < 1 {
 		fmt.Println("Cannot detect resolution")
 	}
