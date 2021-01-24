@@ -70,9 +70,25 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error detecting y resolution")
 		fmt.Println(err)
 	}
-	ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("resolution:%vx%v", x, y)))
+	out, err = exec.Command("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream_tags=rotate", "-of", "default=nw=1:nk=1", "-i", fmt.Sprintf("files/temp-videos/%v", filename)).Output()
+	rotation, err := strconv.Atoi(strings.TrimSpace(string(out)))
+	if err != nil {
+		fmt.Println("Error detecting rotation")
+		fmt.Println(err)
+	}
+
 	nativeSize := math.Max(x, y)
 	aspectRatio := y / x
+
+	// Check and see if there's metadata for rotation. If so and it's 90deg or 270deg, swap the x and y resolution.
+	if (rotation-90)%180 == 0 {
+		tmpX := x
+		x = y
+		y = tmpX
+	}
+
+	ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("resolution:%vx%v", x, y)))
+	fmt.Printf("resolution:%vx%v\n", x, y)
 
 	// For bitrates, we use 2 * the number of pixels
 	// I.e. 8k has 33 million pixels, so we use 66Mbps
@@ -84,7 +100,11 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 	// ( 1280 + 854 ) / 2 == 1600
 	if nativeSize > 1067 {
 		nativeBitrate = "1.8M"
-		downscaleResolution = fmt.Sprintf("854x%0.f", math.RoundToEven(854*aspectRatio/2)*2)
+		if x > y {
+			downscaleResolution = fmt.Sprintf("854x%0.f", math.RoundToEven(854*aspectRatio/2)*2)
+		} else {
+			downscaleResolution = fmt.Sprintf("%0.fx854", math.RoundToEven(854*aspectRatio/2)*2)
+		}
 		if time, err = EncodeToFormat(ws, filename, "-480p", "0.8M", downscaleResolution); err != nil {
 			return
 		}
@@ -95,7 +115,11 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 	// ( 1920 + 1280 ) / 2 == 1600
 	if nativeSize > 1600 {
 		nativeBitrate = "4M"
-		downscaleResolution = fmt.Sprintf("1280x%0.f", math.RoundToEven(1280*aspectRatio/2)*2)
+		if x > y {
+			downscaleResolution = fmt.Sprintf("1280x%0.f", math.RoundToEven(1280*aspectRatio/2)*2)
+		} else {
+			downscaleResolution = fmt.Sprintf("%0.fx1280", math.RoundToEven(1280*aspectRatio/2)*2)
+		}
 		if time, err = EncodeToFormat(ws, filename, "-720p", "1.8M", downscaleResolution); err != nil {
 			return
 		}
@@ -106,7 +130,11 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 	// ( 2560 + 1920 ) / 2 == 2240
 	if nativeSize > 2240 {
 		nativeBitrate = "7.2M"
-		downscaleResolution = fmt.Sprintf("1920x%0.f", math.RoundToEven(1920*aspectRatio/2)*2)
+		if x > y {
+			downscaleResolution = fmt.Sprintf("1920x%0.f", math.RoundToEven(1920*aspectRatio/2)*2)
+		} else {
+			downscaleResolution = fmt.Sprintf("%0.fx1920", math.RoundToEven(1920*aspectRatio/2)*2)
+		}
 		if time, err = EncodeToFormat(ws, filename, "-1080p", "4M", downscaleResolution); err != nil {
 			return
 		}
@@ -117,7 +145,11 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 	// ( 3840 + 2560 ) / 2 == 3200
 	if nativeSize > 3200 {
 		nativeBitrate = "16.6M"
-		downscaleResolution = fmt.Sprintf("2560x%0.f", math.RoundToEven(2560*aspectRatio/2)*2)
+		if x > y {
+			downscaleResolution = fmt.Sprintf("2560x%0.f", math.RoundToEven(2560*aspectRatio/2)*2)
+		} else {
+			downscaleResolution = fmt.Sprintf("%0.fx2560", math.RoundToEven(2560*aspectRatio/2)*2)
+		}
 		if time, err = EncodeToFormat(ws, filename, "-1440p", "7.2M", downscaleResolution); err != nil {
 			return
 		}
@@ -129,7 +161,11 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 	// ( 7680 + 3840 ) / 2 == 5760
 	if nativeSize > 5760 {
 		nativeBitrate = "66M"
-		downscaleResolution = fmt.Sprintf("3840x%0.f", math.RoundToEven(3840*aspectRatio/2)*2)
+		if x > y {
+			downscaleResolution = fmt.Sprintf("3840x%0.f", math.RoundToEven(3840*aspectRatio/2)*2)
+		} else {
+			downscaleResolution = fmt.Sprintf("%0.fx3840", math.RoundToEven(3840*aspectRatio/2)*2)
+		}
 		if time, err = EncodeToFormat(ws, filename, "-2160p", "16.6M", downscaleResolution); err != nil {
 			return
 		}

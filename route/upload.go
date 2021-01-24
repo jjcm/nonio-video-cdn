@@ -22,9 +22,7 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 
 	// Get the user's email if we're authorized
 	bearerToken := r.Header.Get("Authorization")
-	fmt.Println(bearerToken)
 	user, err := util.GetUserEmail(bearerToken)
-	fmt.Println(user)
 	if err != nil {
 		util.SendError(w, fmt.Sprintf("User is not authorized. Token: %v", bearerToken), 400)
 		return
@@ -75,6 +73,8 @@ func UploadFile(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 	tempFile.Write(fileBytes)
+
+	fmt.Printf("Moving %v to %v\n", url, tempFile.Name())
 
 	util.SendResponse(w, filepath.Base(tempFile.Name()), 200)
 }

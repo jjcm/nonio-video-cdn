@@ -17,8 +17,6 @@ type authorizationResponse struct {
 // GetUserEmail checks token on the server to see if it's valid, and if so returns the user's email
 func GetUserEmail(bearerToken string) (string, error) {
 	// Send a req to the api to get the email from our token, if it's valid
-	fmt.Println("pporty port is")
-	fmt.Println(config.Settings.Port)
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", fmt.Sprintf("%v/protected", config.Settings.APIHost), nil)
 	req.Header.Add("Authorization", bearerToken)
