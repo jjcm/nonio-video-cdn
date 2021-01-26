@@ -55,7 +55,7 @@ func MoveFile(w http.ResponseWriter, r *http.Request) {
 	*/
 
 	// If everything else looks good, lets move the file.
-	err = os.Rename(fmt.Sprintf("files/videos/%v.mp4", tempFile), fmt.Sprintf("files/images/%v.mp4", url))
+	err = os.Rename(fmt.Sprintf("files/videos/%v.mp4", tempFile), fmt.Sprintf("files/videos/%v.mp4", url))
 	if err != nil {
 		util.SendError(w, "Error renaming file.", 500)
 		return
