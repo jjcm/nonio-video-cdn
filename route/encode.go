@@ -70,10 +70,14 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Error detecting y resolution")
 		fmt.Println(err)
 	}
-	out, err = exec.Command("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream_tags=rotate", "-of", "default=nw=1:nk=1", "-i", fmt.Sprintf("files/temp-videos/%v", filename)).Output()
+	out, err = exec.Command("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream_side_data=rotation", "-of", "default=nw=1:nk=1", "-i", fmt.Sprintf("files/temp-videos/%v", filename)).Output()
+	if err != nil {
+		fmt.Println("Error getting rotation from ffprobe")
+		fmt.Println(err)
+	}
 	rotation, err := strconv.Atoi(strings.TrimSpace(string(out)))
 	if err != nil {
-		fmt.Println("Error detecting rotation")
+		fmt.Println("Error parsing rotation")
 		fmt.Println(err)
 	}
 
