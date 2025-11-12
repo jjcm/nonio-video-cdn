@@ -28,6 +28,18 @@ func MoveFile(w http.ResponseWriter, r *http.Request) {
 
 	// Parse our url, and check if the url is available
 	url := r.FormValue("url")
+	
+	// Store mapping from temp filename to post URL for encoding completion notification
+	tempFile := r.FormValue("oldUrl")
+	if tempFile != "" {
+		// Remove .mp4 extension if present to match the base filename used in encode
+		baseFilename := tempFile
+		if len(baseFilename) > 4 && baseFilename[len(baseFilename)-4:] == ".mp4" {
+			baseFilename = baseFilename[:len(baseFilename)-4]
+		}
+		util.SetFilenameToURL(baseFilename, url)
+	}
+	
 	urlIsAvailable, err := util.CheckIfURLIsAvailable(url)
 	if err != nil {
 		util.SendError(w, fmt.Sprintf("Error checking requested url: %v", url), 500)
@@ -39,11 +51,14 @@ func MoveFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if the file we're moving exists
-	tempFile := r.FormValue("oldUrl")
-	if _, err := os.Stat(fmt.Sprintf("files/videos/%v.mp4", tempFile)); os.IsNotExist(err) {
-		util.SendError(w, "No temp image exists with that name.", 400)
-		fmt.Println(err)
+	// Check if the encoded files exist in files/videos/
+	// If encoding is not complete yet, just store the mapping and return success
+	// The files will be moved when encoding completes
+	_, err = os.Stat(fmt.Sprintf("files/videos/%v.mp4", tempFile))
+	if os.IsNotExist(err) {
+		// Files don't exist yet (encoding in progress), just store mapping and return
+		// The encoding completion handler will move the files
+		util.SendResponse(w, url, 200)
 		return
 	}
 	/*

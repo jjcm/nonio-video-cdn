@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"soci-video-cdn/util"
@@ -27,7 +28,8 @@ var (
 	}
 )
 
-// Encode accepts a filename as a param. File must be the temp file returned by upload.go
+// Encode accepts either a filename or url as a param
+// If url is provided, it looks up the temp filename and connects to existing encoding if in progress
 func Encode(w http.ResponseWriter, r *http.Request) {
 	// Allow connections from anywhere
 	if r.Method == "OPTIONS" {
@@ -49,8 +51,78 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
-	// Get the value of the width and height of the video, then store whichever is largest
-	filename := r.URL.Query()["file"][0]
+	// Get filename from either 'file' or 'url' parameter
+	var filename string
+	var baseFilename string
+	
+	if urlParam, ok := r.URL.Query()["url"]; ok && len(urlParam) > 0 && urlParam[0] != "" {
+		// URL parameter provided - look up the temp filename
+		postURL := urlParam[0]
+		tempFilename, found := util.GetFilenameFromURL(postURL)
+		if !found {
+			ws.WriteMessage(websocket.TextMessage, []byte("Error: No encoding session found for this URL"))
+			ws.Close()
+			return
+		}
+		baseFilename = tempFilename
+		filename = tempFilename + ".mp4"
+		
+		// Check if encoding is already in progress
+		if session, exists := util.GetSession(baseFilename); exists {
+			// Add this connection to the existing session
+			session.AddConnection(ws)
+			// Send current resolution if available
+			if session.Resolution != "" {
+				ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("resolution:%v", session.Resolution)))
+			}
+			// Keep connection alive - progress updates will be broadcast from the encoding process
+			// Wait for connection to close
+			for {
+				_, _, err := ws.ReadMessage()
+				if err != nil {
+					break
+				}
+			}
+			return
+		}
+		// If no session exists but we have a URL, we can't start encoding without the temp file
+		// This shouldn't happen, but handle it gracefully
+		ws.WriteMessage(websocket.TextMessage, []byte("Error: Encoding not started for this URL"))
+		ws.Close()
+		return
+	} else if fileParam, ok := r.URL.Query()["file"]; ok && len(fileParam) > 0 {
+		// File parameter provided - use it directly
+		filename = fileParam[0]
+		baseFilename = strings.TrimSuffix(filename, filepath.Ext(filename))
+	} else {
+		ws.WriteMessage(websocket.TextMessage, []byte("Error: Must provide either 'file' or 'url' parameter"))
+		ws.Close()
+		return
+	}
+
+	// Check if encoding is already in progress for this file
+	if session, exists := util.GetSession(baseFilename); exists {
+		// Encoding already in progress - add this connection to the session
+		session.AddConnection(ws)
+		// Send current resolution if available
+		if session.Resolution != "" {
+			ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("resolution:%v", session.Resolution)))
+		}
+		// Keep connection alive
+		for {
+			_, _, err := ws.ReadMessage()
+			if err != nil {
+				break
+			}
+		}
+		return
+	}
+
+	// Start new encoding session
+	session := util.GetOrCreateSession(baseFilename)
+	session.AddConnection(ws)
+	defer util.CloseSession(baseFilename)
+
 	fmt.Printf("Encoding starting for %v\n", filename)
 	out, err := exec.Command("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0", fmt.Sprintf("files/temp-videos/%v", filename)).Output()
 	if err != nil {
@@ -92,7 +164,9 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		y = tmpX
 	}
 
-	ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("resolution:%vx%v", x, y)))
+	resolutionMsg := fmt.Sprintf("resolution:%vx%v", x, y)
+	session.Resolution = fmt.Sprintf("%vx%v", x, y)
+	session.Broadcast([]byte(resolutionMsg))
 	fmt.Printf("resolution:%vx%v\n", x, y)
 
 	// For bitrates, we use 2 * the number of pixels
@@ -110,7 +184,7 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		} else {
 			downscaleResolution = fmt.Sprintf("%0.fx854", math.RoundToEven(854*(x/y)/2)*2)
 		}
-		if time, err = EncodeToFormat(ws, filename, "-480p", "0.8M", downscaleResolution); err != nil {
+		if time, err = EncodeToFormat(session, filename, "-480p", "0.8M", downscaleResolution); err != nil {
 			return
 		}
 		fmt.Printf("480p finished: %vs\n", time)
@@ -125,7 +199,7 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		} else {
 			downscaleResolution = fmt.Sprintf("%0.fx1280", math.RoundToEven(1280*(x/y)/2)*2)
 		}
-		if time, err = EncodeToFormat(ws, filename, "-720p", "1.8M", downscaleResolution); err != nil {
+		if time, err = EncodeToFormat(session, filename, "-720p", "1.8M", downscaleResolution); err != nil {
 			return
 		}
 		fmt.Printf("720p finished: %vs\n", time)
@@ -140,7 +214,7 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		} else {
 			downscaleResolution = fmt.Sprintf("%0.fx1920", math.RoundToEven(1920*(x/y)/2)*2)
 		}
-		if time, err = EncodeToFormat(ws, filename, "-1080p", "4M", downscaleResolution); err != nil {
+		if time, err = EncodeToFormat(session, filename, "-1080p", "4M", downscaleResolution); err != nil {
 			return
 		}
 		fmt.Printf("1080p finished: %vs\n", time)
@@ -155,7 +229,7 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		} else {
 			downscaleResolution = fmt.Sprintf("%0.fx2560", math.RoundToEven(2560*(x/y)/2)*2)
 		}
-		if time, err = EncodeToFormat(ws, filename, "-1440p", "7.2M", downscaleResolution); err != nil {
+		if time, err = EncodeToFormat(session, filename, "-1440p", "7.2M", downscaleResolution); err != nil {
 			return
 		}
 		fmt.Printf("1440p finished: %vs\n", time)
@@ -171,21 +245,41 @@ func Encode(w http.ResponseWriter, r *http.Request) {
 		} else {
 			downscaleResolution = fmt.Sprintf("%0.fx3840", math.RoundToEven(3840*(x/y)/2)*2)
 		}
-		if time, err = EncodeToFormat(ws, filename, "-2160p", "16.6M", downscaleResolution); err != nil {
+		if time, err = EncodeToFormat(session, filename, "-2160p", "16.6M", downscaleResolution); err != nil {
 			return
 		}
 		fmt.Printf("4k finished: %vs\n", time)
 	}
 
-	if time, err = EncodeToFormat(ws, filename, "", nativeBitrate, fmt.Sprintf("%0.fx%0.f", x, y)); err != nil {
+	if time, err = EncodeToFormat(session, filename, "", nativeBitrate, fmt.Sprintf("%0.fx%0.f", x, y)); err != nil {
 		return
 	}
 	fmt.Printf("Source finished: %vs\n", time)
 	fmt.Printf("Encoding finished for %v\n", filename)
+
+	// Check if we have a URL mapping for this filename (user submitted while encoding)
+	if postURL, ok := util.GetURLFromFilename(baseFilename); ok {
+		// Move the encoded files to the final URL
+		err := moveEncodedFiles(baseFilename, postURL)
+		if err != nil {
+			fmt.Printf("Error moving encoded files: %v\n", err)
+		} else {
+			fmt.Printf("Moved encoded files from %v to %v\n", baseFilename, postURL)
+		}
+		
+		// Notify backend that encoding is complete
+		if err := util.NotifyEncodingComplete(postURL); err != nil {
+			fmt.Printf("Error notifying backend of encoding completion: %v\n", err)
+		} else {
+			fmt.Printf("Notified backend that encoding is complete for %v\n", postURL)
+		}
+		// Clean up the mapping
+		util.DeleteFilenameMapping(baseFilename)
+	}
 }
 
-// EncodeToFormat encodes a video source and sends back progress via the websocket
-func EncodeToFormat(ws *websocket.Conn, filename string, suffix string, bitrate string, size string) (int64, error) {
+// EncodeToFormat encodes a video source and sends back progress via the websocket session
+func EncodeToFormat(session *util.EncodingSession, filename string, suffix string, bitrate string, size string) (int64, error) {
 	now := time.Now()
 	start := now.Unix()
 	// Set up our encoding options
@@ -221,7 +315,7 @@ func EncodeToFormat(ws *websocket.Conn, filename string, suffix string, bitrate 
 		// Easiest way to test: try and encode a h264 video at 25x25 resolution
 		// It will fail since h264 doesn't allow resolutions that arent divisible by 2
 		fmt.Println(err)
-		ws.WriteMessage(websocket.TextMessage, []byte("Error"))
+		session.Broadcast([]byte("Error"))
 		return 0, err
 	}
 
@@ -231,12 +325,37 @@ func EncodeToFormat(ws *websocket.Conn, filename string, suffix string, bitrate 
 		suffix = strings.TrimPrefix(suffix, "-")
 	}
 	for msg := range progress {
-		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%v:%.1f", suffix, msg.GetProgress())))
+		progressMsg := []byte(fmt.Sprintf("%v:%.1f", suffix, msg.GetProgress()))
+		session.Broadcast(progressMsg)
 	}
-	ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%v:100", suffix)))
+	session.Broadcast([]byte(fmt.Sprintf("%v:100", suffix)))
 
 	now = time.Now()
 	end := now.Unix()
 
 	return end - start, nil
+}
+
+// moveEncodedFiles moves all encoded video files from temp filename to final URL
+func moveEncodedFiles(tempFile, finalURL string) error {
+	// Move source file
+	if _, err := os.Stat(fmt.Sprintf("files/videos/%v.mp4", tempFile)); err == nil {
+		if err := os.Rename(fmt.Sprintf("files/videos/%v.mp4", tempFile), fmt.Sprintf("files/videos/%v.mp4", finalURL)); err != nil {
+			return fmt.Errorf("error renaming source file: %v", err)
+		}
+	}
+
+	// Move resolution variants
+	resolutions := []string{"2160p", "1440p", "1080p", "720p", "480p"}
+	for _, res := range resolutions {
+		srcPath := fmt.Sprintf("files/videos/%v-%v.mp4", tempFile, res)
+		dstPath := fmt.Sprintf("files/videos/%v-%v.mp4", finalURL, res)
+		if _, err := os.Stat(srcPath); err == nil {
+			if err := os.Rename(srcPath, dstPath); err != nil {
+				return fmt.Errorf("error renaming %v file: %v", res, err)
+			}
+		}
+	}
+
+	return nil
 }
